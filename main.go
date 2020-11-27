@@ -1,14 +1,5 @@
 package main
 
-/*
-https://tutorialedge.net/projects/hacker-news-clone-vuejs/part-4-hitting-an-api/
-https://medium.com/chris-opperwall/using-the-hacker-news-api-9904e9ab2bc1
-https://medium.com/@inhereat/terminal-color-rendering-tool-library-support-8-16-colors-256-colors-by-golang-a68fb8deee86
-https://github.com/manifoldco/promptui
-https://libs.garden/go/terminal
-https://github.com/HackerNews/API
-https://www.google.com/search?q=commandline+interface+golang&oq=commandline+interface+golang&aqs=chrome..69i57j0l7.9567j0j1&sourceid=chrome&ie=UTF-8
-*/
 import (
 	"encoding/json"
 	"flag"
@@ -39,7 +30,8 @@ func getTopID10(numstories int) []int {
 	response, err := http.Get("https://hacker-news.firebaseio.com/v0/topstories.json")
 
 	if err != nil {
-		fmt.Println(err)
+		color.Error.Printf("%s \n", err)
+
 		os.Exit(1)
 	}
 	defer response.Body.Close()
@@ -48,7 +40,8 @@ func getTopID10(numstories int) []int {
 	err = json.Unmarshal(bytes, &storiesID)
 
 	if err != nil {
-		fmt.Println(err)
+		color.Error.Printf("%s \n", err)
+
 		os.Exit(1)
 	}
 
@@ -61,10 +54,20 @@ func convertUnixtime(unixTime string) string {
 	unixTimeInt64, err := strconv.ParseInt(unixTime, 10, 64)
 
 	if err != nil {
-		fmt.Println(err)
+		color.Error.Printf("%s \n", err)
+
 		os.Exit(1)
 	}
-	return time.Unix(unixTimeInt64, 0).String()
+	tm := time.Unix(unixTimeInt64, 0)
+	timeNow := time.Now()
+	hnhour := time.Time.Hour(tm)
+	nowHour := time.Time.Hour(timeNow)
+	// the minus part is because of diffrence in time zones
+	hoursPastInterger := (nowHour - hnhour) - 2
+
+	hoursPast := strconv.Itoa(hoursPastInterger)
+
+	return hoursPast
 
 }
 
@@ -80,7 +83,8 @@ func getStoriesData(numstories int) []Story {
 		response, err := http.Get(fmt.Sprintf("https://hacker-news.firebaseio.com/v0/item/%s.json", stringStoriID))
 
 		if err != nil {
-			fmt.Println(err)
+			// fmt.Println(err)
+			color.Error.Printf("%s \n", err)
 			os.Exit(1)
 		}
 		defer response.Body.Close()
@@ -89,7 +93,8 @@ func getStoriesData(numstories int) []Story {
 		err = json.Unmarshal(bytes, &story)
 
 		if err != nil {
-			fmt.Println(err)
+			color.Error.Printf("%s \n", err)
+			// fmt.Println(err)
 			os.Exit(1)
 		}
 		stories = append(stories, story)
@@ -100,26 +105,36 @@ func getStoriesData(numstories int) []Story {
 }
 func displayStories(storiesSlice []Story) {
 
-	for _, value := range storiesSlice {
-		stringUnixtime := strconv.Itoa(value.Time)
+	for index, value := range storiesSlice {
+		indexString := strconv.Itoa(index + 1)
 
-		fmt.Println(value.Title)
-		fmt.Println("By : " + value.By)
-		fmt.Println(value.URL)
-		fmt.Println("Time : " + convertUnixtime(stringUnixtime) + "\n")
+		color.Error.Println(fmt.Sprintf("%s %s", value.Type, indexString))
+
+		stringUnixtime := strconv.Itoa(value.Time)
+		// color.Print(fmt.Sprintf("\n<fg=yellow;bg=black;op=underscore;>%s</>\n", value.Title))
+		// color.Print(fmt.Sprintf("<fg=yellow;bg=black;op=underscore;>By : %s</>\n", value.By))
+		// color.Print(fmt.Sprintf("<fg=yellow;bg=black;op=underscore;>%s</>\n", value.URL))
+		// color.Print(fmt.Sprintf("<fg=yellow;bg=black;op=underscore;>%s</>\n", convertUnixtime(stringUnixtime)))
+
+		fmt.Println("\n-------------------------------------")
+		fmt.Println(value.Title + "|")
+		fmt.Println("By : " + value.By + "|")
+		fmt.Println(value.URL + "|")
+		fmt.Println("Written " + convertUnixtime(stringUnixtime) + " hours ago |")
+		fmt.Println("------------------------------------- \n")
 	}
 
 }
 
 func main() {
-	color.Info.Tips("Fetching Stories \n")
-	numberOfStories := flag.Int("stories", 10, "how many stories do you want")
+	numberOfStories := flag.Int("s", 10, "how many stories do you want")
 	flag.Parse()
 
 	if *numberOfStories > 50 {
-		fmt.Println("Maximum stories to fetch is 50")
+		color.Error.Println("Maximum stories to fetch is 50")
 		os.Exit(1)
 	}
+	color.Info.Tips("Fetching Stories \n")
 	stories := getStoriesData(*numberOfStories)
 	displayStories(stories)
 }
