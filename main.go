@@ -25,10 +25,42 @@ type Story struct {
 	URL         string
 }
 
-func getTopID10(numstories int) []int {
-	var storiesID []int
-	response, err := http.Get("https://hacker-news.firebaseio.com/v0/topstories.json")
+const baseurl = "https://hacker-news.firebaseio.com/v0"
 
+// parse time
+func convertUnixtime(unixTime string) string {
+	// convert unixTime to int64
+	unixTimeInt64, err := strconv.ParseInt(unixTime, 10, 64)
+
+	if err != nil {
+		color.Error.Printf("%s \n", err)
+
+		os.Exit(1)
+	}
+	tm := time.Unix(unixTimeInt64, 0)
+	timeNow := time.Now()
+	hnhour := time.Time.Hour(tm)
+	nowHour := time.Time.Hour(timeNow)
+	// the minus part is because of diffrence in time zones
+	hoursPastInterger := (nowHour - hnhour) - 2
+	hoursPast := strconv.Itoa(hoursPastInterger)
+
+	return hoursPast
+
+}
+
+/*
+ TODO:
+- storeids in redis and compare each time if the ids has changed to avoid
+fetching from the server each time
+- view stories as pages and not 10 stories each time
+
+*/
+
+// All the id
+func getID(numstories int) []int {
+	var storiesID []int
+	response, err := http.Get(fmt.Sprintf("%s/topstories.json", baseurl))
 	if err != nil {
 		color.Error.Printf("%s \n", err)
 
@@ -44,46 +76,21 @@ func getTopID10(numstories int) []int {
 
 		os.Exit(1)
 	}
-
-	return storiesID[:numstories]
-}
-
-func convertUnixtime(unixTime string) string {
-	// convert unixTime to int64
-
-	unixTimeInt64, err := strconv.ParseInt(unixTime, 10, 64)
-
-	if err != nil {
-		color.Error.Printf("%s \n", err)
-
-		os.Exit(1)
-	}
-	tm := time.Unix(unixTimeInt64, 0)
-	timeNow := time.Now()
-	hnhour := time.Time.Hour(tm)
-	nowHour := time.Time.Hour(timeNow)
-	// the minus part is because of diffrence in time zones
-	hoursPastInterger := (nowHour - hnhour) - 2
-
-	hoursPast := strconv.Itoa(hoursPastInterger)
-
-	return hoursPast
-
+	return storiesID[numstories : numstories+10]
 }
 
 func getStoriesData(numstories int) []Story {
 	var story Story
 	var stories []Story
-	storiesID := getTopID10(numstories)
+	storiesID := getID(numstories)
 	time.Sleep(2 * time.Second)
 
 	for _, value := range storiesID {
 		stringStoriID := strconv.Itoa(value)
 
-		response, err := http.Get(fmt.Sprintf("https://hacker-news.firebaseio.com/v0/item/%s.json", stringStoriID))
+		response, err := http.Get(fmt.Sprintf("%s/item/%s.json", baseurl, stringStoriID))
 
 		if err != nil {
-			// fmt.Println(err)
 			color.Error.Printf("%s \n", err)
 			os.Exit(1)
 		}
@@ -94,7 +101,6 @@ func getStoriesData(numstories int) []Story {
 
 		if err != nil {
 			color.Error.Printf("%s \n", err)
-			// fmt.Println(err)
 			os.Exit(1)
 		}
 		stories = append(stories, story)
@@ -111,29 +117,22 @@ func displayStories(storiesSlice []Story) {
 		color.Error.Println(fmt.Sprintf("%s %s", value.Type, indexString))
 
 		stringUnixtime := strconv.Itoa(value.Time)
-		// color.Print(fmt.Sprintf("\n<fg=yellow;bg=black;op=underscore;>%s</>\n", value.Title))
-		// color.Print(fmt.Sprintf("<fg=yellow;bg=black;op=underscore;>By : %s</>\n", value.By))
-		// color.Print(fmt.Sprintf("<fg=yellow;bg=black;op=underscore;>%s</>\n", value.URL))
-		// color.Print(fmt.Sprintf("<fg=yellow;bg=black;op=underscore;>%s</>\n", convertUnixtime(stringUnixtime)))
 
 		fmt.Println("\n-------------------------------------")
 		fmt.Println(value.Title + "|")
 		fmt.Println("By : " + value.By + "|")
 		fmt.Println(value.URL + "|")
 		fmt.Println("Written " + convertUnixtime(stringUnixtime) + " hours ago |")
-		fmt.Println("------------------------------------- \n")
+		fmt.Println("------------------------------------- ")
 	}
 
 }
 
 func main() {
-	numberOfStories := flag.Int("s", 10, "how many stories do you want")
+	// change to where to start
+	numberOfStories := flag.Int("s", 0, "Show stories from")
 	flag.Parse()
 
-	if *numberOfStories > 50 {
-		color.Error.Println("Maximum stories to fetch is 50")
-		os.Exit(1)
-	}
 	color.Info.Tips("Fetching Stories \n")
 	stories := getStoriesData(*numberOfStories)
 	displayStories(stories)
