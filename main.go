@@ -5,9 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gookit/color"
@@ -25,42 +28,10 @@ type Story struct {
 	URL         string
 }
 
-const baseurl = "https://hacker-news.firebaseio.com/v0"
-
-// parse time
-func convertUnixtime(unixTime string) string {
-	// convert unixTime to int64
-	unixTimeInt64, err := strconv.ParseInt(unixTime, 10, 64)
-
-	if err != nil {
-		color.Error.Printf("%s \n", err)
-
-		os.Exit(1)
-	}
-	tm := time.Unix(unixTimeInt64, 0)
-	timeNow := time.Now()
-	hnhour := time.Time.Hour(tm)
-	nowHour := time.Time.Hour(timeNow)
-	// the minus part is because of diffrence in time zones
-	hoursPastInterger := (nowHour - hnhour) - 2
-	hoursPast := strconv.Itoa(hoursPastInterger)
-
-	return hoursPast
-
-}
-
-/*
- TODO:
-- storeids in redis and compare each time if the ids has changed to avoid
-fetching from the server each time
-- view stories as pages and not 10 stories each time
-
-*/
-
-// All the id
-func getID(numstories int) []int {
+func getTopID10(numstories int) []int {
 	var storiesID []int
-	response, err := http.Get(fmt.Sprintf("%s/topstories.json", baseurl))
+	response, err := http.Get("https://hacker-news.firebaseio.com/v0/topstories.json")
+
 	if err != nil {
 		color.Error.Printf("%s \n", err)
 
@@ -76,21 +47,45 @@ func getID(numstories int) []int {
 
 		os.Exit(1)
 	}
-	return storiesID[numstories : numstories+10]
+
+	return storiesID[:numstories]
+}
+
+func convertUnixtime(unixTime string) string {
+	// convert unixTime to int64
+
+	unixTimeInt64, err := strconv.ParseInt(unixTime, 10, 64)
+
+	if err != nil {
+		color.Error.Printf("%s \n", err)
+
+		os.Exit(1)
+	}
+	tm := time.Unix(unixTimeInt64, 0)
+	timeNow := time.Now()
+	hnhour := time.Time.Hour(tm)
+	nowHour := time.Time.Hour(timeNow)
+	// the minus part is because of diffrence in time zones
+	hoursPastInterger := (nowHour - hnhour) - 2
+
+	hoursPast := strconv.Itoa(hoursPastInterger)
+
+	return hoursPast
 }
 
 func getStoriesData(numstories int) []Story {
 	var story Story
 	var stories []Story
-	storiesID := getID(numstories)
-	time.Sleep(2 * time.Second)
+	storiesID := getTopID10(numstories)
+	// time.Sleep(2 * time.Second)
 
 	for _, value := range storiesID {
 		stringStoriID := strconv.Itoa(value)
 
-		response, err := http.Get(fmt.Sprintf("%s/item/%s.json", baseurl, stringStoriID))
+		response, err := http.Get(fmt.Sprintf("https://hacker-news.firebaseio.com/v0/item/%s.json", stringStoriID))
 
 		if err != nil {
+			// fmt.Println(err)
 			color.Error.Printf("%s \n", err)
 			os.Exit(1)
 		}
@@ -101,39 +96,58 @@ func getStoriesData(numstories int) []Story {
 
 		if err != nil {
 			color.Error.Printf("%s \n", err)
+			// fmt.Println(err)
 			os.Exit(1)
 		}
 		stories = append(stories, story)
-		time.Sleep(1 * time.Second)
+		// time.Sleep(1 * time.Second)
 
 	}
 	return stories
 }
+
 func displayStories(storiesSlice []Story) {
+	var output string
+	var color = "\033[32m"
 
 	for index, value := range storiesSlice {
 		indexString := strconv.Itoa(index + 1)
-
-		color.Error.Println(fmt.Sprintf("%s %s", value.Type, indexString))
-
 		stringUnixtime := strconv.Itoa(value.Time)
+		currentTime := convertUnixtime(stringUnixtime)
 
-		fmt.Println("\n-------------------------------------")
-		fmt.Println(value.Title + "|")
-		fmt.Println("By : " + value.By + "|")
-		fmt.Println(value.URL + "|")
-		fmt.Println("Written " + convertUnixtime(stringUnixtime) + " hours ago |")
-		fmt.Println("------------------------------------- ")
+		output += fmt.Sprintf(`
+%s %s %s
+-------------------------------------
+%s |
+By %s |
+%s |
+Written %s hours ago |
+		 
+		 `, color, value.Type, indexString, value.Title, value.By, value.URL, currentTime)
+	}
+
+	cmd := exec.Command("/usr/bin/less")
+	cmd.Stdin = strings.NewReader(output)
+	cmd.Stdout = os.Stdout
+
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 }
 
 func main() {
-	// change to where to start
-	numberOfStories := flag.Int("s", 0, "Show stories from")
+	numberOfStories := flag.Int("s", 10, "how many stories do you want")
 	flag.Parse()
 
+	if *numberOfStories > 50 {
+		color.Error.Println("Maximum stories to fetch is 50")
+		os.Exit(1)
+	}
 	color.Info.Tips("Fetching Stories \n")
+
 	stories := getStoriesData(*numberOfStories)
 	displayStories(stories)
+
 }
