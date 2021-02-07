@@ -138,7 +138,7 @@ Written %s hours ago |
 }
 
 func main() {
-	numberOfStories := flag.Int("s", 10, "how many stories do you want")
+	numberOfStories := flag.Int("stories", 10, "how many stories do you want read")
 	flag.Parse()
 
 	if *numberOfStories > 50 {
