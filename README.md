@@ -9,7 +9,6 @@ This is a very simple hackernews client in Golang
 ```sh
 $ git clone https://github.com/MuhiaKevin/gohn.git
 $ cd gohn
-$ go get ./...
 $ go build && ./gohn 
 ```
 
