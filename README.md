@@ -1,6 +1,6 @@
 #  GoHN
 
-This is a very simple hackernews client in Golang 
+This is a very simple hackernews client in Go
 
 ![alt test](gohndemo.gif)
 
